@@ -7,12 +7,12 @@ import lombok.Data;
 
 @Data
 @AllArgsConstructor
-public class PlayerResponse {
-	private PlayerData data;
+public class Response {
+	private ResponseData data;
 
 	@Data
 	@AllArgsConstructor
-	public static class PlayerData {
+	public static class ResponseData {
 		private List<Player> players;
 	}
 }

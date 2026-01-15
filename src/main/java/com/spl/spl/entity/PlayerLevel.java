@@ -1,20 +1,16 @@
 package com.spl.spl.entity;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.Entity;
-import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import lombok.Data;
 
 @Entity
-@Table(name = "player")
+@Table(name = "player_level")
 @Data
-public class Player {
+public class PlayerLevel {
 
 	@Id
 	@GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -22,10 +18,4 @@ public class Player {
 	
 	private String code;
 	private String name;
-	private String imageUrl;
-
-	@ManyToOne(fetch = FetchType.LAZY)
-	@JoinColumn(name = "player_level_id")
-	@JsonIgnore
-	private PlayerLevel playerLevel;
 }
