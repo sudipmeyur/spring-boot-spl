@@ -25,8 +25,4 @@ public class Team {
 	private String code;
 	private String name;
 	private String logoUrl;
-
-	@OneToMany(mappedBy = "team", fetch = FetchType.LAZY)
-	@JsonIgnore
-	private List<PlayerTeam> playerTeams;
 }

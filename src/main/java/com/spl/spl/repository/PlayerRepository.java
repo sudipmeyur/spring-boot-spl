@@ -12,6 +12,6 @@ public interface PlayerRepository extends JpaRepository<Player, Long> {
 
 	Player findByCode(String code);
 
-	@Query("SELECT p FROM Player p WHERE p.playerLevel.code = :playerLevelCode AND p.id NOT IN (SELECT pt.player.id FROM PlayerTeam pt WHERE pt.season.code = :seasonCode)")
+	@Query("SELECT p FROM Player p WHERE p.playerLevel.code = :playerLevelCode AND p.id NOT IN (SELECT pt.player.id FROM PlayerTeam pt WHERE pt.teamSeason.season.code = :seasonCode)")
 	List<Player> findPlayersNotInSeasonByLevel(@Param("seasonCode") String seasonCode, @Param("playerLevelCode") String playerLevelCode);
 }

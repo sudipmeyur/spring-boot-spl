@@ -31,13 +31,8 @@ public class PlayerTeam {
 
 	@Id
 	@ManyToOne
-	@JoinColumn(name = "team_id")
-	private Team team;
-
-	@Id
-	@ManyToOne
-	@JoinColumn(name = "season_id")
-	private Season season;
+	@JoinColumn(name = "team_season_id")
+	private TeamSeason teamSeason;
 
 	private BigDecimal soldAmount;
 

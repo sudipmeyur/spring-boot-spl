@@ -7,7 +7,6 @@ import lombok.Data;
 public class PlayerTeamRequest {
 	private String code;
 	private String playerCode;
-	private String teamCode;
-	private String seasonCode;
+	private String teamSeasonCode;
 	private BigDecimal soldAmount;
 }

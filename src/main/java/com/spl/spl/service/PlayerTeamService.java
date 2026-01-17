@@ -6,12 +6,10 @@ import org.springframework.transaction.annotation.Transactional;
 import com.spl.spl.dto.PlayerTeamRequest;
 import com.spl.spl.entity.Player;
 import com.spl.spl.entity.PlayerTeam;
-import com.spl.spl.entity.Season;
-import com.spl.spl.entity.Team;
+import com.spl.spl.entity.TeamSeason;
 import com.spl.spl.repository.PlayerRepository;
 import com.spl.spl.repository.PlayerTeamRepository;
-import com.spl.spl.repository.SeasonRepository;
-import com.spl.spl.repository.TeamRepository;
+import com.spl.spl.repository.TeamSeasonRepository;
 import lombok.RequiredArgsConstructor;
 
 @Service
@@ -20,23 +18,20 @@ public class PlayerTeamService {
 
 	private final PlayerTeamRepository playerTeamRepository;
 	private final PlayerRepository playerRepository;
-	private final TeamRepository teamRepository;
-	private final SeasonRepository seasonRepository;
+	private final TeamSeasonRepository teamSeasonRepository;
 
 	@Transactional
 	public PlayerTeam savePlayerTeam(PlayerTeamRequest request) {
 
 		Player player = playerRepository.findByCode(request.getPlayerCode());
-		Team team = teamRepository.findByCode(request.getTeamCode());
-		Season season = seasonRepository.findByCode(request.getSeasonCode());
+		TeamSeason teamSeason = teamSeasonRepository.findByCode(request.getTeamSeasonCode());
 
-		String generatedCode = player.getCode() + season.getCode() + team.getCode();
+		String generatedCode = player.getCode() + teamSeason.getCode();
 
 		if (StringUtils.isBlank(request.getCode())) {
 			PlayerTeam playerTeam = new PlayerTeam();
 			playerTeam.setPlayer(player);
-			playerTeam.setTeam(team);
-			playerTeam.setSeason(season);
+			playerTeam.setTeamSeason(teamSeason);
 			playerTeam.setCode(generatedCode);
 			playerTeam.setSoldAmount(request.getSoldAmount());
 			return playerTeamRepository.save(playerTeam);
@@ -47,8 +42,7 @@ public class PlayerTeamService {
 				playerTeamRepository.delete(existingPlayerTeam);
 				PlayerTeam newPlayerTeam = new PlayerTeam();
 				newPlayerTeam.setPlayer(player);
-				newPlayerTeam.setTeam(team);
-				newPlayerTeam.setSeason(season);
+				newPlayerTeam.setTeamSeason(teamSeason);
 				newPlayerTeam.setCode(generatedCode);
 				newPlayerTeam.setSoldAmount(request.getSoldAmount());
 				return playerTeamRepository.save(newPlayerTeam);
@@ -58,5 +52,4 @@ public class PlayerTeamService {
 			}
 		}
 	}
-
 }

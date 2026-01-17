@@ -1,6 +1,5 @@
 package com.spl.spl.entity;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
@@ -26,6 +25,5 @@ public class Player {
 
 	@ManyToOne(fetch = FetchType.LAZY)
 	@JoinColumn(name = "player_level_id")
-	@JsonIgnore
 	private PlayerLevel playerLevel;
 }
