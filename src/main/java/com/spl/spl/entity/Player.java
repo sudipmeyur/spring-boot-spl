@@ -1,5 +1,8 @@
 package com.spl.spl.entity;
 
+import com.fasterxml.jackson.annotation.JsonView;
+import com.spl.spl.views.Views;
+
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
@@ -19,10 +22,15 @@ public class Player {
 	@GeneratedValue(strategy = GenerationType.IDENTITY)
 	private Long id;
 	
+	@JsonView(Views.Summary.class)
 	private String code;
+	
+	@JsonView(Views.Summary.class)
 	private String name;
+	@JsonView(Views.Summary.class)
 	private String imageUrl;
 
+	@JsonView(Views.Summary.class)
 	@ManyToOne(fetch = FetchType.LAZY)
 	@JoinColumn(name = "player_level_id")
 	private PlayerLevel playerLevel;

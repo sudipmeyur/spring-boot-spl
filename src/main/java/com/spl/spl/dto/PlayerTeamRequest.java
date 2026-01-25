@@ -9,4 +9,6 @@ public class PlayerTeamRequest {
 	private String playerCode;
 	private String teamSeasonCode;
 	private BigDecimal soldAmount;
+	private Boolean isFree;
+	private Boolean isRtmUsed;
 }

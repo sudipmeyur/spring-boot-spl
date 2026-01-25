@@ -20,8 +20,8 @@ public class PlayerService {
 		return playerRepository.findAll();
 	}
 
-	public List<Player> getAvailablePlayersByLevelShuffled(String seasonCode, String playerLevelCode) {
-		List<Player> players = new ArrayList<>(playerRepository.findPlayersNotInSeasonByLevel(seasonCode, playerLevelCode));
+	public List<Player> getAvailablePlayersByLevelShuffled(Long seasonId, Long playerLevelId) {
+		List<Player> players = new ArrayList<>(playerRepository.findPlayersNotInTeamByLevel(seasonId, playerLevelId));
 		Collections.shuffle(players, random);
 		return players;
 	}
