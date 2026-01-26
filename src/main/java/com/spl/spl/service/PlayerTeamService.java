@@ -1,13 +1,13 @@
 package com.spl.spl.service;
 
-import java.math.BigDecimal;
-import java.util.ArrayList;
-import java.util.List;
 import static java.util.stream.Collectors.groupingBy;
 import static java.util.stream.Collectors.summarizingDouble;
 
+import java.math.BigDecimal;
+import java.util.ArrayList;
+import java.util.List;
+
 import org.apache.commons.lang3.StringUtils;
-import org.apache.coyote.BadRequestException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -17,11 +17,14 @@ import com.spl.spl.entity.PlayerTeam;
 import com.spl.spl.entity.Season;
 import com.spl.spl.entity.TeamSeason;
 import com.spl.spl.entity.TeamSeasonPlayerLevel;
+import com.spl.spl.entity.UnsoldPlayer;
 import com.spl.spl.exception.PlayerLimitExceededException;
+import com.spl.spl.exception.SplBadRequestException;
 import com.spl.spl.repository.PlayerRepository;
 import com.spl.spl.repository.PlayerTeamRepository;
-import com.spl.spl.repository.TeamSeasonRepository;
 import com.spl.spl.repository.TeamSeasonPlayerLevelRepository;
+import com.spl.spl.repository.TeamSeasonRepository;
+import com.spl.spl.repository.UnsoldPlayerRepository;
 
 import lombok.RequiredArgsConstructor;
 
@@ -33,6 +36,7 @@ public class PlayerTeamService {
 	private final PlayerRepository playerRepository;
 	private final TeamSeasonRepository teamSeasonRepository;
 	private final TeamSeasonPlayerLevelRepository teamSeasonPlayerLevelRepository;
+	private final UnsoldPlayerRepository unsoldPlayerRepository;
 
 	@Transactional
 	public PlayerTeam savePlayerTeam(PlayerTeamRequest request) {
@@ -48,6 +52,8 @@ public class PlayerTeamService {
 		
 		Player player = playerRepository.findByCode(request.getPlayerCode());
 		
+		validateAmount(season,player,request);
+		
 		summary.add(teamSeason);
 
 		String generatedCode = player.getCode() + teamSeason.getCode();
@@ -60,6 +66,8 @@ public class PlayerTeamService {
 			playerTeam.setSoldAmount(request.getSoldAmount());
 			playerTeam.setIsFree(request.getIsFree());
 			playerTeam.setIsRtmUsed(request.getIsRtmUsed());
+			playerTeam.setWasUnsold(request.getIsUnsold());
+			playerTeam.setIsManager(request.getIsManager());
 			result = playerTeamRepository.save(playerTeam);
 			
 			// Manual list management
@@ -82,6 +90,8 @@ public class PlayerTeamService {
 				newPlayerTeam.setSoldAmount(request.getSoldAmount());
 				newPlayerTeam.setIsFree(request.getIsFree());
 				newPlayerTeam.setIsRtmUsed(request.getIsRtmUsed());
+				newPlayerTeam.setWasUnsold(request.getIsUnsold());
+				newPlayerTeam.setIsManager(request.getIsManager());
 				result = playerTeamRepository.save(newPlayerTeam);
 				
 				// Add to new team season
@@ -90,14 +100,42 @@ public class PlayerTeamService {
 				existingPlayerTeam.setSoldAmount(request.getSoldAmount());
 				existingPlayerTeam.setIsFree(request.getIsFree());
 				existingPlayerTeam.setIsRtmUsed(request.getIsRtmUsed());
+				existingPlayerTeam.setWasUnsold(request.getIsUnsold());
+				existingPlayerTeam.setIsManager(request.getIsManager());
 				result = playerTeamRepository.save(existingPlayerTeam);
 				// No list changes needed - just amount update
+			}
+		}
+		
+		if(result.getWasUnsold()!=null && result.getWasUnsold()) {
+			UnsoldPlayer existingUnsoldPlayer = unsoldPlayerRepository.findBySeasonIdAndPlayerId(season.getId(),player.getId());
+			if(existingUnsoldPlayer!=null) {
+				unsoldPlayerRepository.delete(existingUnsoldPlayer);
 			}
 		}
 		
 		manageTeamSeasonStatus(summary);
 		
 		return result;
+	}
+
+	private void validateAmount(Season season, Player player, PlayerTeamRequest request) {
+		if(request.getSoldAmount() == null) {
+			throw new SplBadRequestException("Sold Amount is required");
+		}else if(request.getIsFree() != null && request.getIsFree()) {
+			if(BigDecimal.ZERO.compareTo(request.getSoldAmount()) != 0) {
+				throw new SplBadRequestException("Sold Amount should be zero for free player");
+			}
+		}else if(request.getIsUnsold() != null && request.getIsUnsold()) {
+			if(season.getMinPlayerAmount().compareTo(request.getSoldAmount()) != 0) {
+				throw new SplBadRequestException("Sold Amount should be equals to Min Player Amount for unsold player");
+			}
+		}else {
+			BigDecimal baseAmount = player.getPlayerLevel().getBaseAmount();
+			if(baseAmount != null && baseAmount.compareTo(request.getSoldAmount()) > 0) {
+				throw new SplBadRequestException("Sold Amount should not be less than Base Amount");
+			}
+		}
 	}
 
 	private void validateTotalFreeUsed(Season season, TeamSeason teamSeason, PlayerTeamRequest request) {

@@ -57,6 +57,10 @@ public class PlayerTeam {
 	@JsonView(Views.Summary.class)
 	@Column(columnDefinition = "boolean default false")
 	private Boolean isFree;
+	
+	@JsonView(Views.Summary.class)
+	@Column(columnDefinition = "boolean default false")
+	private Boolean wasUnsold;
 
 	@CreatedDate
 	@Column(updatable = false)
