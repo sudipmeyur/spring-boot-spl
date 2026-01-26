@@ -27,6 +27,9 @@ public class Season {
 	private Integer year;
 	
 	@JsonView(Views.Summary.class)
+	private BigDecimal minPlayerAmount;
+	
+	@JsonView(Views.Summary.class)
 	private BigDecimal budgetLimit;
 	
 	@JsonView(Views.Summary.class)

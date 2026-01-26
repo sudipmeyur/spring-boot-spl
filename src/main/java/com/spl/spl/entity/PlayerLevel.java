@@ -35,4 +35,8 @@ public class PlayerLevel {
 	@JsonView(Views.PlayerLevel.class)
 	@Column(columnDefinition = "boolean default false")
 	private Boolean isFree;
+	
+	@JsonView(Views.PlayerLevel.class)
+	@Column(columnDefinition = "boolean default false")
+	private Boolean isRandomTeamSelection;
 }

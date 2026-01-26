@@ -11,4 +11,6 @@ public class PlayerTeamRequest {
 	private BigDecimal soldAmount;
 	private Boolean isFree;
 	private Boolean isRtmUsed;
+	private String seasonCode;
+	
 }

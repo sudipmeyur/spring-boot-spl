@@ -12,6 +12,19 @@ public interface PlayerRepository extends JpaRepository<Player, Long> {
 
 	Player findByCode(String code);
 
-	@Query("SELECT p FROM Player p WHERE p.playerLevel.id = :playerLevelId AND p.id NOT IN (SELECT pt.player.id FROM PlayerTeam pt WHERE pt.teamSeason.season.id = :seasonId)")
+	@Query("""
+		SELECT p FROM Player p 
+		LEFT JOIN PlayerTeam pt ON p.id = pt.player.id AND pt.teamSeason.season.id = :seasonId
+		LEFT JOIN UnsoldPlayer usp ON p.id = usp.player.id AND usp.season.id = :seasonId
+		WHERE p.playerLevel.id = :playerLevelId 
+		AND pt.player.id IS NULL 
+		AND usp.player.id IS NULL
+		""")
 	List<Player> findPlayersNotInTeamByLevel(@Param("seasonId") Long seasonId, @Param("playerLevelId") Long playerLevelId);
+
+	@Query("""
+		SELECT p FROM Player p 
+		JOIN UnsoldPlayer usp ON p.id = usp.player.id AND usp.season.id = :seasonId
+		""")
+	List<Player> findUnsoldPlayers(@Param("seasonId") Long seasonId);
 }
