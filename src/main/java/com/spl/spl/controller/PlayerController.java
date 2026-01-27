@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.spl.spl.dto.ItemsResponse;
 import com.spl.spl.dto.ItemsResponse.ItemsData;
+import com.spl.spl.dto.PlayerInfoDto;
 import com.spl.spl.dto.PlayerTeamRequest;
 import com.spl.spl.entity.Player;
 import com.spl.spl.entity.UnsoldPlayer;
@@ -53,5 +54,12 @@ public class PlayerController {
 			@RequestParam String seasonId) {
 		List<Player> players = playerService.getUnsoldPlayersShuffled(Long.valueOf(seasonId));
 		return ResponseEntity.ok(new ItemsResponse<>(new ItemsData<>(players)));
+	}
+	
+	@GetMapping("/auction-result")
+	public ResponseEntity<ItemsResponse<PlayerInfoDto>> getAllAuctionResultPlayers(
+			@RequestParam String seasonId) {
+		List<PlayerInfoDto> playerInfos = playerService.getAllAuctionResultPlayers(Long.valueOf(seasonId));
+		return ResponseEntity.ok(new ItemsResponse<>(new ItemsData<>(playerInfos)));
 	}
 }

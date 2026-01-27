@@ -3,6 +3,7 @@ package com.spl.spl.entity;
 import com.fasterxml.jackson.annotation.JsonView;
 import com.spl.spl.views.Views;
 
+import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
@@ -29,6 +30,9 @@ public class Player {
 	private String name;
 	@JsonView(Views.Summary.class)
 	private String imageUrl;
+	
+	@Column(columnDefinition = "boolean default true")
+	private Boolean isActive;
 
 	@JsonView(Views.Summary.class)
 	@ManyToOne(fetch = FetchType.LAZY)

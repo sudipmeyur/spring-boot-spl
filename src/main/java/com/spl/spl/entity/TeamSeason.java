@@ -62,7 +62,11 @@ public class TeamSeason {
 	
 	@JsonView(Views.Summary.class)
 	private Integer totalPlayer;
-
+	
+	@JsonView(Views.Summary.class)
+	@Column(columnDefinition = "boolean default false")
+	private Boolean isRtmEligible;
+	
 	@JsonView(Views.TeamSeasonView.class)
 	@OneToMany(mappedBy = "teamSeason", fetch = FetchType.LAZY)
 	private List<PlayerTeam> playerTeams;

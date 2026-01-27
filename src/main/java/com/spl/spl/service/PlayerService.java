@@ -9,9 +9,9 @@ import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.spl.spl.dto.PlayerInfoDto;
 import com.spl.spl.dto.PlayerTeamRequest;
 import com.spl.spl.entity.Player;
-import com.spl.spl.entity.PlayerTeam;
 import com.spl.spl.entity.Season;
 import com.spl.spl.entity.UnsoldPlayer;
 import com.spl.spl.exception.SplBadRequestException;
@@ -64,5 +64,10 @@ public class PlayerService {
 		List<Player> players = new ArrayList<>(playerRepository.findUnsoldPlayers(seasonId));
 		Collections.shuffle(players, random);
 		return players;
+	}
+
+	public List<PlayerInfoDto> getAllAuctionResultPlayers(Long seasonId) {
+		List<PlayerInfoDto> playerInfos = new ArrayList<>(playerRepository.findAllPlayers(seasonId));
+		return playerInfos;
 	}
 }
