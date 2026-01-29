@@ -27,7 +27,8 @@ import lombok.Data;
 
 @Entity
 @Table(name = "team_season", uniqueConstraints = {
-	@UniqueConstraint(columnNames = {"team_id", "season_id"})
+	@UniqueConstraint(columnNames = {"team_id", "season_id"}),
+	@UniqueConstraint(columnNames = "code")
 })
 @EntityListeners(AuditingEntityListener.class)
 @Data
@@ -39,6 +40,7 @@ public class TeamSeason {
 	private Long id;
 
 	@JsonView(Views.Base.class)
+	@Column(unique = true)
 	private String code;
 
 	@JsonView(Views.Summary.class)

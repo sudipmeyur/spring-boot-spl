@@ -48,6 +48,9 @@ public class TeamSeasonPlayerLevel {
 	private BigDecimal totalAmountSpent;
 	
 	@JsonView(Views.Summary.class)
+	private BigDecimal nextPlayerBudget;
+	
+	@JsonView(Views.Summary.class)
 	private Integer totalPlayerCount;
 
 	@LastModifiedDate

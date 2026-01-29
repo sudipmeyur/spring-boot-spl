@@ -12,6 +12,7 @@ import com.spl.spl.entity.Player;
 public interface PlayerRepository extends JpaRepository<Player, Long> {
 
 	Player findByCode(String code);
+	List<Player> findByIsActive(Boolean isActive);
 
 	@Query("""
 		SELECT p FROM Player p 
@@ -34,7 +35,7 @@ public interface PlayerRepository extends JpaRepository<Player, Long> {
 	@Query("""
 		SELECT new com.spl.spl.dto.PlayerInfoDto(p,
 			pt,
-			(usp.player.id IS NOT NULL)
+			usp
 		)
 		FROM Player p 
 		LEFT JOIN PlayerTeam pt ON p.id = pt.player.id AND pt.teamSeason.season.id = :seasonId
@@ -42,4 +43,6 @@ public interface PlayerRepository extends JpaRepository<Player, Long> {
 		WHERE p.isActive = true
 		""")
 	List<PlayerInfoDto> findAllPlayers(@Param("seasonId") Long seasonId);
+
+	
 }

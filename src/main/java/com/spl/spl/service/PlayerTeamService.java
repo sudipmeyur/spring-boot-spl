@@ -1,16 +1,25 @@
 package com.spl.spl.service;
 
+import org.springframework.expression.Expression;
+import org.springframework.expression.ExpressionParser;
+import org.springframework.expression.spel.standard.SpelExpressionParser;
+import org.springframework.expression.spel.support.StandardEvaluationContext;
+
+
 import static java.util.stream.Collectors.groupingBy;
 import static java.util.stream.Collectors.summarizingDouble;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.spl.spl.dto.PlayerLevelCalcDto;
 import com.spl.spl.dto.PlayerTeamRequest;
 import com.spl.spl.entity.Player;
 import com.spl.spl.entity.PlayerTeam;
@@ -119,6 +128,37 @@ public class PlayerTeamService {
 		return result;
 	}
 
+	@Transactional
+	public void revertPlayerTeam(String playerTeamCode) {
+		PlayerTeam playerTeam = playerTeamRepository.findByCode(playerTeamCode);
+		
+		if (playerTeam == null) {
+			throw new com.spl.spl.exception.ResourceNotFoundException("PlayerTeam", playerTeamCode);
+		}
+		
+		List<TeamSeason> affectedTeamSeasons = new ArrayList<>();
+		TeamSeason teamSeason = playerTeam.getTeamSeason();
+		Season season = teamSeason.getSeason();
+		Player player = playerTeam.getPlayer();
+		
+		affectedTeamSeasons.add(teamSeason);
+		
+		// Remove player-team assignment
+		teamSeason.getPlayerTeams().remove(playerTeam);
+		playerTeamRepository.delete(playerTeam);
+		
+		// Restore unsold player record if it was marked as unsold
+		if (playerTeam.getWasUnsold() != null && playerTeam.getWasUnsold()) {
+			UnsoldPlayer unsoldPlayer = new UnsoldPlayer();
+			unsoldPlayer.setPlayer(player);
+			unsoldPlayer.setSeason(season);
+			unsoldPlayerRepository.save(unsoldPlayer);
+		}
+		
+		// Recalculate team season statistics
+		manageTeamSeasonStatus(affectedTeamSeasons);
+	}
+
 	private void validateAmount(Season season, Player player, PlayerTeamRequest request) {
 		if(request.getSoldAmount() == null) {
 			throw new SplBadRequestException("Sold Amount is required");
@@ -197,5 +237,152 @@ public class PlayerTeamService {
 				}
 			}
 		}
+	}
+
+    private static final ExpressionParser parser = new SpelExpressionParser();
+    
+    public static double solveAndSetRemaining(PlayerLevelCalcDto root, String dbRule) {
+    	StandardEvaluationContext context = new StandardEvaluationContext(root);
+    	
+    	// Expand simplified notation (l1.property -> playerLevels.l1.property)
+    	String expandedDbRule = expandSimplifiedNotation(dbRule);
+    	
+    	// Parse the rule to extract left side, operator, and threshold
+    	RuleComponents components = parseRule(expandedDbRule);
+    	
+    	// Convert dot notation to bracket notation for HashMap access
+    	String convertedLeftSide = convertDotNotationInFormula(components.leftSide);
+    	
+    	// Evaluate the left side to get current total
+    	Expression leftSideExpr = parser.parseExpression(convertedLeftSide);
+    	Object leftSideValue = leftSideExpr.getValue(context);
+    	double currentTotal = leftSideValue != null ? Double.parseDouble(leftSideValue.toString()) : 0.0;
+    	
+    	// Calculate remaining based on operator and threshold
+    	double adjustedThreshold = adjustThresholdForOperator(components.threshold, components.operator);
+    	double remaining = adjustedThreshold - currentTotal;
+    	
+    	// Round to 2 decimal places and ensure non-negative result
+    	double roundedRemaining = Math.round(remaining * 100.0) / 100.0;
+    	return Math.max(0, roundedRemaining);
+    }
+    
+    private static class RuleComponents {
+    	String leftSide;
+    	String operator;
+    	double threshold;
+    	
+    	RuleComponents(String leftSide, String operator, double threshold) {
+    		this.leftSide = leftSide;
+    		this.operator = operator;
+    		this.threshold = threshold;
+    	}
+    }
+    
+    private static RuleComponents parseRule(String rule) {
+    	// Parse rules like "l1.amount + l2.amount <= 100"
+    	if (rule.contains(" <= ")) {
+    		String[] parts = rule.split("\\s*<=\\s*");
+    		return new RuleComponents(parts[0].trim(), "<=", Double.parseDouble(parts[1].trim()));
+    	} else if (rule.contains(" >= ")) {
+    		String[] parts = rule.split("\\s*>=\\s*");
+    		return new RuleComponents(parts[0].trim(), ">=", Double.parseDouble(parts[1].trim()));
+    	} else if (rule.contains(" < ")) {
+    		String[] parts = rule.split("\\s*<\\s*");
+    		return new RuleComponents(parts[0].trim(), "<", Double.parseDouble(parts[1].trim()));
+    	} else if (rule.contains(" > ")) {
+    		String[] parts = rule.split("\\s*>\\s*");
+    		return new RuleComponents(parts[0].trim(), ">", Double.parseDouble(parts[1].trim()));
+    	} else if (rule.contains(" == ") || rule.contains(" = ")) {
+    		String[] parts = rule.split("\\s*(==|=)\\s*");
+    		return new RuleComponents(parts[0].trim(), "==", Double.parseDouble(parts[1].trim()));
+    	}
+    	
+    	throw new IllegalArgumentException("Unsupported rule format: " + rule);
+    }
+    
+    private static double adjustThresholdForOperator(double threshold, String operator) {
+    	switch (operator) {
+    		case "<":
+    			return threshold - 0.01;
+    		case ">":
+    			return threshold + 0.01;
+    		case "<=":
+    		case ">=":
+    		case "==":
+    		default:
+    			return threshold;
+    	}
+    }
+    
+    private static String expandSimplifiedNotation(String input) {
+    	// Convert simplified notation like "l1.totalAmountSpent" to "playerLevels.l1.totalAmountSpent"
+    	// This handles patterns like l1.property, l2.property, etc.
+    	return input.replaceAll("\\b(l\\d+)\\.", "playerLevels.$1.");
+    }
+    
+    private static String convertDotNotationInFormula(String formula) {
+    	// Convert all playerLevels.lX.property patterns to bracket notation
+    	return formula.replaceAll("playerLevels\\.([a-zA-Z0-9]+)\\.", "playerLevels['$1'].");
+    }
+    
+	private static String convertToSpelMapAccess(String dotNotation) {
+		// Convert "playerLevels.l1.totalAmountSpent" to "playerLevels['l1'].totalAmountSpent"
+		// Handle cases like "playerLevels.l1.totalAmountSpent" or "playerLevels.l2.maxBudget"
+		
+		if (!dotNotation.contains(".")) {
+			return dotNotation;
+		}
+		
+		String[] parts = dotNotation.split("\\.");
+		if (parts.length < 3) {
+			return dotNotation; // Not the expected format
+		}
+		
+		// Check if it's a playerLevels map access pattern
+		if ("playerLevels".equals(parts[0])) {
+			StringBuilder result = new StringBuilder();
+			result.append(parts[0]); // "playerLevels"
+			result.append("['").append(parts[1]).append("']"); // "['l1']"
+			
+			// Add remaining parts with dot notation
+			for (int i = 2; i < parts.length; i++) {
+				result.append(".").append(parts[i]);
+			}
+			
+			return result.toString();
+		}
+		
+		// For other patterns, return as-is
+		return dotNotation;
+	}
+
+	public static void main(String [] args){
+		
+		PlayerLevelCalcDto dto = getDummyData();
+		
+		// Test different comparison operators with rounding
+		System.out.println("Remaining amount (<=): " + solveAndSetRemaining(dto, "l1.totalAmountSpent + l2.totalAmountSpent <= 100"));
+		System.out.println("Remaining amount (<): " + solveAndSetRemaining(dto, "l1.totalAmountSpent + l2.totalAmountSpent < 100"));
+		System.out.println("Remaining amount (>): " + solveAndSetRemaining(dto, "l1.totalAmountSpent + l2.totalAmountSpent > 100"));
+		
+		// Test with a threshold that would create more decimal places
+		System.out.println("Remaining amount (< 99.999): " + solveAndSetRemaining(dto, "l1.totalAmountSpent + l2.totalAmountSpent < 99.999"));
+
+	}
+
+	private static PlayerLevelCalcDto getDummyData() {
+		PlayerLevelCalcDto dto = new PlayerLevelCalcDto();
+		Map<String,TeamSeasonPlayerLevel> playerLevels = new HashMap<String, TeamSeasonPlayerLevel>();
+		
+		TeamSeasonPlayerLevel l1 = new TeamSeasonPlayerLevel();
+		l1.setTotalAmountSpent(new BigDecimal("35"));
+		playerLevels.put("l1", l1);
+		
+		TeamSeasonPlayerLevel l2 = new TeamSeasonPlayerLevel();
+		l2.setTotalAmountSpent(new BigDecimal("21"));
+		playerLevels.put("l2", l2);
+		dto.setPlayerLevels(playerLevels);
+		return dto;
 	}
 }

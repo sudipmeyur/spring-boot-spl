@@ -20,15 +20,19 @@ import jakarta.persistence.IdClass;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import lombok.Data;
 
 @Entity
-@Table(name = "player_team")
+@Table(name = "player_team", uniqueConstraints = {
+	@UniqueConstraint(columnNames = "code")
+})
 @IdClass(PlayerTeamId.class)
 @EntityListeners(AuditingEntityListener.class)
 @Data
 public class PlayerTeam {
 	
+	@Column(unique = true)
 	private String code;
 
 	@Id

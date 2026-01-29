@@ -4,15 +4,19 @@ import java.math.BigDecimal;
 
 import com.fasterxml.jackson.annotation.JsonView;
 import com.spl.spl.views.Views;
+import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import lombok.Data;
 
 @Entity
-@Table(name = "season")
+@Table(name = "season", uniqueConstraints = {
+	@UniqueConstraint(columnNames = "code")
+})
 @Data
 public class Season {
 
@@ -22,6 +26,7 @@ public class Season {
 	private Long id;
 
 	@JsonView(Views.Base.class)
+	@Column(unique = true)
 	private String code;
 	
 	private Integer year;

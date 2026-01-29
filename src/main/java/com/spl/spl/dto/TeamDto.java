@@ -18,6 +18,9 @@ import lombok.NoArgsConstructor;
 public class TeamDto {
 	
 	@JsonView(Views.Base.class)
+	private String playerTeamCode;
+	
+	@JsonView(Views.Base.class)
 	private Team team;
 	
 	@JsonView(Views.Summary.class)

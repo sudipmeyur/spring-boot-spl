@@ -11,10 +11,13 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import lombok.Data;
 
 @Entity
-@Table(name = "player_level")
+@Table(name = "player_level", uniqueConstraints = {
+	@UniqueConstraint(columnNames = "code")
+})
 @Data
 public class PlayerLevel {
 
@@ -24,6 +27,7 @@ public class PlayerLevel {
 	private Long id;
 	
 	@JsonView(Views.Base.class)
+	@Column(unique = true)
 	private String code;
 	
 	@JsonView(Views.PlayerLevel.class)
