@@ -32,7 +32,9 @@ public class PlayerInfoDto {
 			this.teamInfo = TeamDto.builder()
 					.playerTeamCode(playerTeam.getCode())
 					.team(playerTeam.getTeamSeason().getTeam())
-					.isManager(playerTeam.getIsManager()).isRtmUsed(playerTeam.getIsRtmUsed())
+					.isManager(playerTeam.getIsManager())
+					.isRtmUsed(playerTeam.getIsRtmUsed())
+					.soldAmount(playerTeam.getSoldAmount())
 					.build();
 		}
 		this.isUnsold= unsoldPlayer != null;

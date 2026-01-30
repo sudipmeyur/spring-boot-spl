@@ -32,52 +32,55 @@ public class PlayerService {
 	private final Random random = new Random();
 
 	public List<Player> getAllPlayers() {
-		return playerRepository.findByIsActive(Boolean.TRUE);	}
+		return playerRepository.findByIsActive(Boolean.TRUE);
+	}
 
 	public List<Player> getAvailablePlayersByLevelShuffled(Long seasonId, Long playerLevelId) {
 		List<Player> players = new ArrayList<>(playerRepository.findPlayersNotInTeamByLevel(seasonId, playerLevelId));
 		Collections.shuffle(players, random);
 		return players;
 	}
-	
+
 	@Transactional
 	public UnsoldPlayer saveUnsoldPlayer(PlayerTeamRequest request) {
 		validateRequiredFields(request);
 		Player player = playerRepository.findByCode(request.getPlayerCode());
 		Season season = seasonRepository.findByCode(request.getSeasonCode());
-		
+
 		if (player == null) {
 			throw new com.spl.spl.exception.ResourceNotFoundException("Player", request.getPlayerCode());
 		}
-		
+
 		if (season == null) {
 			throw new com.spl.spl.exception.ResourceNotFoundException("Season", request.getSeasonCode());
 		}
-		
+
 		// Check if unsold player already exists
-		UnsoldPlayer existingUnsoldPlayer = unsoldPlayerRepository.findBySeasonIdAndPlayerId(season.getId(), player.getId());
+		UnsoldPlayer existingUnsoldPlayer = unsoldPlayerRepository.findBySeasonIdAndPlayerId(season.getId(),
+				player.getId());
 		if (existingUnsoldPlayer != null) {
-			throw new com.spl.spl.exception.DuplicateResourceException("UnsoldPlayer", 
-				player.getCode() + "-" + season.getCode());
+			throw new com.spl.spl.exception.DuplicateResourceException("UnsoldPlayer",
+					player.getCode() + "-" + season.getCode());
 		}
-		
+
 		UnsoldPlayer unsoldPlayer = new UnsoldPlayer();
 		unsoldPlayer.setPlayer(player);
 		unsoldPlayer.setSeason(season);
-		
+
 		UnsoldPlayer savedUnsoldPlayer = unsoldPlayerRepository.save(unsoldPlayer);
 		return savedUnsoldPlayer;
 	}
 
 	private void validateRequiredFields(PlayerTeamRequest request) {
-		if(StringUtils.isAnyBlank(request.getSeasonCode(),request.getPlayerCode())) {
+		if (StringUtils.isAnyBlank(request.getSeasonCode(), request.getPlayerCode())) {
 			throw new SplBadRequestException("SeasonCode and PlayerCode are required fields");
 		}
 	}
+
 	@Transactional
 	public void revertUnsoldPlayerById(Long unsoldPlayerId) {
 		Optional<UnsoldPlayer> unsoldPlayerOpt = unsoldPlayerRepository.findById(unsoldPlayerId);
-		
+
 		unsoldPlayerOpt.ifPresentOrElse(unsoldPlayer -> {
 			unsoldPlayerRepository.delete(unsoldPlayer);
 		}, () -> {
@@ -94,5 +97,11 @@ public class PlayerService {
 	public List<PlayerInfoDto> getAllAuctionResultPlayers(Long seasonId) {
 		List<PlayerInfoDto> playerInfos = new ArrayList<>(playerRepository.findAllPlayers(seasonId));
 		return playerInfos;
+	}
+
+	public Player savePlayer(Player player) {
+		playerRepository.save(player);
+		player.setCode("pl" + player.getId());
+		return player;
 	}
 }

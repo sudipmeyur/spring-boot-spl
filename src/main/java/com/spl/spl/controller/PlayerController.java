@@ -8,6 +8,7 @@ import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -36,6 +37,19 @@ public class PlayerController {
 		List<Player> players = playerService.getAllPlayers();
 		return ResponseEntity.ok(new ItemsResponse<>(new ItemsData<>(players)));
 	}
+	
+	@PostMapping
+	public ResponseEntity<Player> savePlayer(@RequestBody Player player) {
+		Player savedPlayer = playerService.savePlayer(player);
+		return ResponseEntity.ok(savedPlayer);
+	}
+	@PutMapping("/{id}")
+	public ResponseEntity<Player> updatePlayer(@PathVariable String id, @RequestBody Player player) {
+		player.setId(Long.valueOf(id));
+		Player updatedPlayer = playerService.savePlayer(player);
+		return ResponseEntity.ok(updatedPlayer);
+	}
+	
 
 	@GetMapping("/available")
 	public ResponseEntity<ItemsResponse<Player>> getAvailablePlayers(
