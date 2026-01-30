@@ -5,6 +5,7 @@ import static java.util.stream.Collectors.summarizingDouble;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
+import java.util.DoubleSummaryStatistics;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -20,14 +21,16 @@ import org.springframework.transaction.annotation.Transactional;
 import com.spl.spl.dto.PlayerLevelCalcDto;
 import com.spl.spl.dto.PlayerTeamRequest;
 import com.spl.spl.entity.Player;
+import com.spl.spl.entity.PlayerLevel;
 import com.spl.spl.entity.PlayerTeam;
-import com.spl.spl.entity.RuleEntity;
+import com.spl.spl.entity.Rule;
 import com.spl.spl.entity.Season;
 import com.spl.spl.entity.TeamSeason;
 import com.spl.spl.entity.TeamSeasonPlayerLevel;
 import com.spl.spl.entity.UnsoldPlayer;
 import com.spl.spl.exception.PlayerLimitExceededException;
 import com.spl.spl.exception.SplBadRequestException;
+import com.spl.spl.repository.PlayerLevelRepository;
 import com.spl.spl.repository.PlayerRepository;
 import com.spl.spl.repository.PlayerTeamRepository;
 import com.spl.spl.repository.TeamSeasonPlayerLevelRepository;
@@ -45,6 +48,8 @@ public class PlayerTeamService {
 	private final TeamSeasonRepository teamSeasonRepository;
 	private final TeamSeasonPlayerLevelRepository teamSeasonPlayerLevelRepository;
 	private final UnsoldPlayerRepository unsoldPlayerRepository;
+	private final PlayerLevelRepository playerLevelRepository;
+	private final RuleEngine ruleEngine;
 
 	@Transactional
 	public PlayerTeam savePlayerTeam(PlayerTeamRequest request) {
@@ -193,65 +198,118 @@ public class PlayerTeamService {
 		}
 	}
 
+
+
 	private void manageTeamSeasonStatus(List<TeamSeason> summary) {
 		if (summary != null && !summary.isEmpty()) {
+			
+			List<PlayerLevel> allLevels = playerLevelRepository.findAll();
+			
 			for (TeamSeason teamSeason : summary) {
 				if (teamSeason != null) {
-					// Calculate player level summaries
-					teamSeason.getPlayerTeams().stream()
-						.collect(groupingBy(
-							pt -> pt.getPlayer().getPlayerLevel(),
-							summarizingDouble(pt -> pt.getSoldAmount() != null ? pt.getSoldAmount().doubleValue() : 0.0)))
-						.forEach((playerLevel, stats) -> {
-							TeamSeasonPlayerLevel tspl = teamSeasonPlayerLevelRepository
-								.findByTeamSeasonIdAndPlayerLevelId(teamSeason.getId(), playerLevel.getId());
-							if (tspl == null) {
-								tspl = new TeamSeasonPlayerLevel();
-								tspl.setTeamSeason(teamSeason);
-								tspl.setPlayerLevel(playerLevel);
-							}
+					// Calculate player level summaries and collect for DTO
+					Map<String, TeamSeasonPlayerLevel> playerLevelsMap = new HashMap<>();
+
+					Map<String, DoubleSummaryStatistics> playerTeamSummary = teamSeason.getPlayerTeams().stream()
+							.collect(groupingBy(pt -> pt.getPlayer().getPlayerLevel().getCode(),
+									summarizingDouble(
+											pt -> pt.getSoldAmount() != null ? pt.getSoldAmount().doubleValue() : 0.0)));
+					allLevels.forEach(level -> {
+						TeamSeasonPlayerLevel tspl = teamSeasonPlayerLevelRepository
+								.findByTeamSeasonIdAndPlayerLevelId(teamSeason.getId(), level.getId());
+						
+						if (tspl == null) {
+							tspl = new TeamSeasonPlayerLevel();
+							tspl.setTeamSeason(teamSeason);
+							tspl.setPlayerLevel(level);
+						}
+						if(playerTeamSummary.containsKey(level.getCode())) {
+							DoubleSummaryStatistics stats = playerTeamSummary.get(level.getCode());
+							
 							tspl.setTotalAmountSpent(BigDecimal.valueOf(stats.getSum()));
 							tspl.setTotalPlayerCount((int) stats.getCount());
-							teamSeasonPlayerLevelRepository.save(tspl);
-						});
+						}else {
+							tspl.setTotalAmountSpent(BigDecimal.ZERO);
+							tspl.setTotalPlayerCount(0);
+						}
+						teamSeasonPlayerLevelRepository.save(tspl);
+						playerLevelsMap.put(level.getCode(), tspl);
+					});
 					
 					// Update team season totals
-					BigDecimal totalAmount = teamSeason.getPlayerTeams().stream()
-						.map(PlayerTeam::getSoldAmount)
-						.filter(amount -> amount != null)
-						.reduce(BigDecimal.ZERO, BigDecimal::add);
-					
-					long totalRtmUsed =teamSeason.getPlayerTeams().stream()
-							.filter(playerTeam -> playerTeam.getIsRtmUsed() != null && playerTeam.getIsRtmUsed()).count();
-					
-					long totalFreeUsed =teamSeason.getPlayerTeams().stream()
+					BigDecimal totalAmount = teamSeason.getPlayerTeams().stream().map(PlayerTeam::getSoldAmount)
+							.filter(amount -> amount != null).reduce(BigDecimal.ZERO, BigDecimal::add);
+
+					long totalRtmUsed = teamSeason.getPlayerTeams().stream()
+							.filter(playerTeam -> playerTeam.getIsRtmUsed() != null && playerTeam.getIsRtmUsed())
+							.count();
+
+					long totalFreeUsed = teamSeason.getPlayerTeams().stream()
 							.filter(playerTeam -> playerTeam.getIsFree() != null && playerTeam.getIsFree()).count();
-					
-					teamSeason.setTotalRtmUsed((int)totalRtmUsed);				
-					teamSeason.setTotalFreeUsed((int)totalFreeUsed);
-					
+
+					teamSeason.setTotalRtmUsed((int) totalRtmUsed);
+					teamSeason.setTotalFreeUsed((int) totalFreeUsed);
+
 					teamSeason.setTotalAmountSpent(totalAmount);
 					teamSeason.setTotalPlayer(teamSeason.getPlayerTeams().size());
 					teamSeasonRepository.save(teamSeason);
+
+					// Build PlayerLevelCalcDto without DB call
+					PlayerLevelCalcDto playerLevelCalcDto = PlayerLevelCalcDto.builder().team(teamSeason)
+							.season(teamSeason.getSeason()).playerLevels(playerLevelsMap).build();
+
+					updateNextPlayerBudgets(playerLevelCalcDto);
 				}
 			}
 		}
 	}
 
-    private static final ExpressionParser parser = new SpelExpressionParser();
+	private void updateNextPlayerBudgets(PlayerLevelCalcDto dto) {
+
+		TeamSeason team = dto.getTeam();
+		Season season = dto.getSeason();
+		Map<String, TeamSeasonPlayerLevel> playerLevels = dto.getPlayerLevels();
+
+		List<Rule> rules = ruleEngine.getRulesBySeasonAndContext(season.getId(), "player_budget_validation");
+
+		if (rules == null || rules.isEmpty() || playerLevels == null || playerLevels.isEmpty() || team == null
+				|| season == null) {
+			return;
+		}
+
+		double nextPlayerBudget = rules.stream().filter(rule -> StringUtils.equals(rule.getRuleCategory(), "common"))
+				.mapToDouble(rule -> ruleEngine.evaluateRule(dto, rule)).min()
+				.orElse(season.getBudgetLimit().doubleValue());
+
+		for (String level : playerLevels.keySet()) {
+
+			double nextPlayerBudgetPlayerLevel = rules.stream()
+					.filter(rule -> !StringUtils.equals(rule.getRuleCategory(), "common")
+							&& StringUtils.isNotBlank(rule.getRuleStatement()) && rule.getRuleStatement().contains(level + "."))
+					.mapToDouble(rule -> ruleEngine.evaluateRule(dto, rule)).min().orElse(nextPlayerBudget);
+
+			if (nextPlayerBudgetPlayerLevel < nextPlayerBudget) {
+				nextPlayerBudget = nextPlayerBudgetPlayerLevel;
+			}
+
+			playerLevels.get(level).setNextPlayerBudget(BigDecimal.valueOf(nextPlayerBudget));
+		}
+	}
+
+	private static final ExpressionParser parser = new SpelExpressionParser();
     
-    public static double solveAndSetRemaining(PlayerLevelCalcDto root, RuleEntity ruleEntity) {
+    public static double solveAndSetRemaining(PlayerLevelCalcDto root, Rule rule) {
     	StandardEvaluationContext context = new StandardEvaluationContext(root);
     	
     	// Expand simplified notation using database-driven patterns
-    	String expandedDbRule = expandSimplifiedNotation(ruleEntity.getDbRule(), ruleEntity.getNotationMap());
+    	String expandedDbRule = expandSimplifiedNotation(rule.getRuleStatement(), rule.getNotationMap());
     	
     	// Parse the rule to extract left side, operator, and threshold
     	RuleComponents components = parseRule(expandedDbRule);
     	
     	// Convert dot notation to bracket notation using database-driven map names
     	String convertedLeftSide = convertDotNotationInFormula(components.leftSide, 
-    			ruleEntity.getMapNames().toArray(new String[0]));
+    			rule.getMapNames().toArray(new String[0]));
     	
     	// Evaluate the left side to get current total
     	Expression leftSideExpr = parser.parseExpression(convertedLeftSide);
@@ -371,6 +429,11 @@ public class PlayerTeamService {
 		
 		PlayerLevelCalcDto dto = getDummyData();
 		
+		String d = "team.totalAmountSpent + ((season.maxPlayersAllowed - team.totalPlayer)-1) * season.minPlayerAmount <= 100";
+		String d1 = "l1.amount + l2.amount <= 90";
+		
+		System.out.println(d.contains("l1"));
+		System.out.println(d1.contains("l1"));
 		// Test different comparison operators with rounding
 		// System.out.println("Remaining amount (<=): " + solveAndSetRemaining(dto, "l1.totalAmountSpent + l2.totalAmountSpent <= 100"));
 		// System.out.println("Remaining amount (<): " + solveAndSetRemaining(dto, "l1.totalAmountSpent + l2.totalAmountSpent < 100"));
@@ -382,7 +445,7 @@ public class PlayerTeamService {
 	}
 
 	private static PlayerLevelCalcDto getDummyData() {
-		PlayerLevelCalcDto dto = new PlayerLevelCalcDto();
+		PlayerLevelCalcDto dto = PlayerLevelCalcDto.builder().build();
 		Map<String,TeamSeasonPlayerLevel> playerLevels = new HashMap<String, TeamSeasonPlayerLevel>();
 		
 		TeamSeasonPlayerLevel l1 = new TeamSeasonPlayerLevel();

@@ -14,8 +14,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
 import com.spl.spl.dto.PlayerLevelCalcDto;
-import com.spl.spl.entity.RuleEntity;
-import com.spl.spl.repository.RuleEntityRepository;
+import com.spl.spl.entity.Rule;
+import com.spl.spl.repository.SeasonRuleRepository;
 
 import lombok.RequiredArgsConstructor;
 
@@ -23,51 +23,28 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class RuleEngine {
     
-    private final RuleEntityRepository ruleEntityRepository;
+    private final SeasonRuleRepository seasonRuleRepository;
     private static final ExpressionParser parser = new SpelExpressionParser();
     
-    /**
-     * Retrieves all rule entities from the database.
-     * 
-     * @return List of all RuleEntity objects, empty list if none found
-     * @example getAllRules() -> [RuleEntity{id=1, context="player_budget"}, ...]
-     */
-    public List<RuleEntity> getAllRules() {
-        return ruleEntityRepository.findAll();
-    }
     
-    /**
-     * Saves a rule entity to the database.
-     * 
-     * @param ruleEntity The rule entity to save (must not be null)
-     * @return The saved RuleEntity with generated ID
-     * @throws IllegalArgumentException if ruleEntity is null
-     * @example saveRule(new RuleEntity(...)) -> RuleEntity{id=5, ...}
-     */
-    public RuleEntity saveRule(RuleEntity ruleEntity) {
-        if (ruleEntity == null) {
-            throw new IllegalArgumentException("RuleEntity cannot be null");
-        }
-        return ruleEntityRepository.save(ruleEntity);
-    }
     
     /**
      * Retrieves rules filtered by season ID and context.
      * 
      * @param seasonId The season ID to filter by (must not be null)
      * @param context The context to filter by (must not be null or empty)
-     * @return List of matching RuleEntity objects, empty list if none found
+     * @return List of matching Rule objects, empty list if none found
      * @throws IllegalArgumentException if seasonId is null or context is null/empty
-     * @example getRulesBySeasonAndContext(1L, "player_budget") -> [RuleEntity{...}, ...]
+     * @example getRulesBySeasonAndContext(1L, "player_budget") -> [Rule{...}, ...]
      */
-    public List<RuleEntity> getRulesBySeasonAndContext(Long seasonId, String context) {
+    public List<Rule> getRulesBySeasonAndContext(Long seasonId, String context) {
         if (seasonId == null) {
             throw new IllegalArgumentException("Season ID cannot be null");
         }
         if (!StringUtils.hasText(context)) {
             throw new IllegalArgumentException("Context cannot be null or empty");
         }
-        return ruleEntityRepository.findBySeasonAndContext(seasonId, context);
+        return seasonRuleRepository.findBySeasonIdAndRuleContext(seasonId, context);
     }
     
     /**
@@ -91,7 +68,7 @@ public class RuleEngine {
             throw new IllegalArgumentException("PlayerLevelCalcDto cannot be null");
         }
         
-        List<RuleEntity> rules = getRulesBySeasonAndContext(seasonId, context);
+        List<Rule> rules = getRulesBySeasonAndContext(seasonId, context);
         if (rules.isEmpty()) {
             return Collections.emptyList();
         }
@@ -106,33 +83,32 @@ public class RuleEngine {
      * Processes rule through: expansion -> parsing -> conversion -> SpEL evaluation.
      * 
      * @param root The data context for evaluation (must not be null)
-     * @param ruleEntity The rule to evaluate (must not be null with valid dbRule)
+     * @param rule The rule to evaluate (must not be null with valid dbRule)
      * @return Remaining amount (non-negative, rounded to 2 decimal places)
      * @throws IllegalArgumentException if parameters are null or rule is invalid
      * @example evaluateRule(data, rule{"l1.amount <= 100"}) -> 25.5 (if current is 74.5)
      */
-    public double evaluateRule(PlayerLevelCalcDto root, RuleEntity ruleEntity) {
+    public double evaluateRule(PlayerLevelCalcDto root, Rule rule) {
         if (root == null) {
             throw new IllegalArgumentException("PlayerLevelCalcDto cannot be null");
         }
-        if (ruleEntity == null) {
-            throw new IllegalArgumentException("RuleEntity cannot be null");
+        if (rule == null) {
+            throw new IllegalArgumentException("Rule cannot be null");
         }
-        if (!StringUtils.hasText(ruleEntity.getDbRule())) {
+        if (!StringUtils.hasText(rule.getRuleStatement())) {
             throw new IllegalArgumentException("Rule dbRule cannot be null or empty");
         }
-        
         StandardEvaluationContext context = new StandardEvaluationContext(root);
         
         // Step 1: Expand simplified notation (l1.amount -> playerLevels.l1.amount)
-        String expandedDbRule = expandSimplifiedNotation(ruleEntity.getDbRule(), ruleEntity.getNotationMap());
+        String expandedDbRule = expandSimplifiedNotation(rule.getRuleStatement(), rule.getNotationMap());
         
         // Step 2: Parse rule components (left side, operator, threshold)
         RuleComponents components = parseRule(expandedDbRule);
         
         // Step 3: Convert to SpEL bracket notation (playerLevels.l1 -> playerLevels['l1'])
         String convertedLeftSide = convertDotNotationInFormula(components.leftSide, 
-                ruleEntity.getMapNames() != null ? ruleEntity.getMapNames().toArray(new String[0]) : new String[0]);
+                rule.getMapNames() != null ? rule.getMapNames().toArray(new String[0]) : new String[0]);
         
         // Step 4: Evaluate SpEL expression
         Expression leftSideExpr = parser.parseExpression(convertedLeftSide);

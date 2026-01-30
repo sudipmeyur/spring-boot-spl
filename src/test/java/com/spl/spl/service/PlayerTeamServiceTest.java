@@ -20,7 +20,6 @@ public class PlayerTeamServiceTest {
 
     @Test
     public void testSpelMapAccess() {
-        PlayerLevelCalcDto dto = new PlayerLevelCalcDto();
         Map<String, TeamSeasonPlayerLevel> playerLevels = new HashMap<>();
         
         TeamSeasonPlayerLevel l1 = new TeamSeasonPlayerLevel();
@@ -31,9 +30,7 @@ public class PlayerTeamServiceTest {
         l2.setTotalAmountSpent(new BigDecimal("21"));
         playerLevels.put("l2", l2);
         
-        dto.setPlayerLevels(playerLevels);
-        
-        StandardEvaluationContext context = new StandardEvaluationContext(dto);
+        StandardEvaluationContext context = new StandardEvaluationContext(PlayerLevelCalcDto.builder().playerLevels(playerLevels).build());
         
         // Test bracket notation access
         Object val1 = parser.parseExpression("playerLevels['l1'].totalAmountSpent").getValue(context);
@@ -139,7 +136,6 @@ public class PlayerTeamServiceTest {
     }
     
     private static PlayerLevelCalcDto getDummyData() {
-        PlayerLevelCalcDto dto = new PlayerLevelCalcDto();
         Map<String,TeamSeasonPlayerLevel> playerLevels = new HashMap<String, TeamSeasonPlayerLevel>();
         
         TeamSeasonPlayerLevel l1 = new TeamSeasonPlayerLevel();
@@ -149,8 +145,7 @@ public class PlayerTeamServiceTest {
         TeamSeasonPlayerLevel l2 = new TeamSeasonPlayerLevel();
         l2.setTotalAmountSpent(new BigDecimal("21"));
         playerLevels.put("l2", l2);
-        dto.setPlayerLevels(playerLevels);
-        return dto;
+        return PlayerLevelCalcDto.builder().playerLevels(playerLevels).build();
     }
     
     // Helper methods from PlayerTeamService
