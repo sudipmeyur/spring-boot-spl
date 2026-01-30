@@ -98,7 +98,7 @@ public class PlayerService {
 		List<PlayerInfoDto> playerInfos = new ArrayList<>(playerRepository.findAllPlayers(seasonId));
 		return playerInfos;
 	}
-
+	@Transactional
 	public Player savePlayer(Player player) {
 		playerRepository.save(player);
 		player.setCode("pl" + player.getId());
