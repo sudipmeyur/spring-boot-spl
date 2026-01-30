@@ -1,11 +1,5 @@
 package com.spl.spl.service;
 
-import org.springframework.expression.Expression;
-import org.springframework.expression.ExpressionParser;
-import org.springframework.expression.spel.standard.SpelExpressionParser;
-import org.springframework.expression.spel.support.StandardEvaluationContext;
-
-
 import static java.util.stream.Collectors.groupingBy;
 import static java.util.stream.Collectors.summarizingDouble;
 
@@ -16,6 +10,10 @@ import java.util.List;
 import java.util.Map;
 
 import org.apache.commons.lang3.StringUtils;
+import org.springframework.expression.Expression;
+import org.springframework.expression.ExpressionParser;
+import org.springframework.expression.spel.standard.SpelExpressionParser;
+import org.springframework.expression.spel.support.StandardEvaluationContext;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -23,6 +21,7 @@ import com.spl.spl.dto.PlayerLevelCalcDto;
 import com.spl.spl.dto.PlayerTeamRequest;
 import com.spl.spl.entity.Player;
 import com.spl.spl.entity.PlayerTeam;
+import com.spl.spl.entity.RuleEntity;
 import com.spl.spl.entity.Season;
 import com.spl.spl.entity.TeamSeason;
 import com.spl.spl.entity.TeamSeasonPlayerLevel;
@@ -241,17 +240,18 @@ public class PlayerTeamService {
 
     private static final ExpressionParser parser = new SpelExpressionParser();
     
-    public static double solveAndSetRemaining(PlayerLevelCalcDto root, String dbRule) {
+    public static double solveAndSetRemaining(PlayerLevelCalcDto root, RuleEntity ruleEntity) {
     	StandardEvaluationContext context = new StandardEvaluationContext(root);
     	
-    	// Expand simplified notation (l1.property -> playerLevels.l1.property)
-    	String expandedDbRule = expandSimplifiedNotation(dbRule);
+    	// Expand simplified notation using database-driven patterns
+    	String expandedDbRule = expandSimplifiedNotation(ruleEntity.getDbRule(), ruleEntity.getNotationMap());
     	
     	// Parse the rule to extract left side, operator, and threshold
     	RuleComponents components = parseRule(expandedDbRule);
     	
-    	// Convert dot notation to bracket notation for HashMap access
-    	String convertedLeftSide = convertDotNotationInFormula(components.leftSide);
+    	// Convert dot notation to bracket notation using database-driven map names
+    	String convertedLeftSide = convertDotNotationInFormula(components.leftSide, 
+    			ruleEntity.getMapNames().toArray(new String[0]));
     	
     	// Evaluate the left side to get current total
     	Expression leftSideExpr = parser.parseExpression(convertedLeftSide);
@@ -315,15 +315,25 @@ public class PlayerTeamService {
     	}
     }
     
-    private static String expandSimplifiedNotation(String input) {
-    	// Convert simplified notation like "l1.totalAmountSpent" to "playerLevels.l1.totalAmountSpent"
-    	// This handles patterns like l1.property, l2.property, etc.
-    	return input.replaceAll("\\b(l\\d+)\\.", "playerLevels.$1.");
+    private static String expandSimplifiedNotation(String input, Map<String, String> patternReplacements) {
+    	// Convert simplified notation using configurable pattern-replacement pairs
+    	// Example: {"l": "playerLevels.l", "t": "teamStats.t"} converts multiple patterns
+    	String result = input;
+    	for (Map.Entry<String, String> entry : patternReplacements.entrySet()) {
+    		String pattern = entry.getKey();
+    		String replacement = entry.getValue();
+    		result = result.replaceAll("\\b(" + pattern + "\\d+)\\.", replacement.replace(pattern, "$1") + ".");
+    	}
+    	return result;
     }
     
-    private static String convertDotNotationInFormula(String formula) {
-    	// Convert all playerLevels.lX.property patterns to bracket notation
-    	return formula.replaceAll("playerLevels\\.([a-zA-Z0-9]+)\\.", "playerLevels['$1'].");
+    private static String convertDotNotationInFormula(String formula, String... mapNames) {
+    	// Convert dot notation to bracket notation for specified map names
+    	String result = formula;
+    	for (String mapName : mapNames) {
+    		result = result.replaceAll(mapName + "\\.([a-zA-Z0-9]+)\\.", mapName + "['$1'].");
+    	}
+    	return result;
     }
     
 	private static String convertToSpelMapAccess(String dotNotation) {
@@ -362,12 +372,12 @@ public class PlayerTeamService {
 		PlayerLevelCalcDto dto = getDummyData();
 		
 		// Test different comparison operators with rounding
-		System.out.println("Remaining amount (<=): " + solveAndSetRemaining(dto, "l1.totalAmountSpent + l2.totalAmountSpent <= 100"));
-		System.out.println("Remaining amount (<): " + solveAndSetRemaining(dto, "l1.totalAmountSpent + l2.totalAmountSpent < 100"));
-		System.out.println("Remaining amount (>): " + solveAndSetRemaining(dto, "l1.totalAmountSpent + l2.totalAmountSpent > 100"));
+		// System.out.println("Remaining amount (<=): " + solveAndSetRemaining(dto, "l1.totalAmountSpent + l2.totalAmountSpent <= 100"));
+		// System.out.println("Remaining amount (<): " + solveAndSetRemaining(dto, "l1.totalAmountSpent + l2.totalAmountSpent < 100"));
+		// System.out.println("Remaining amount (>): " + solveAndSetRemaining(dto, "l1.totalAmountSpent + l2.totalAmountSpent > 100"));
 		
 		// Test with a threshold that would create more decimal places
-		System.out.println("Remaining amount (< 99.999): " + solveAndSetRemaining(dto, "l1.totalAmountSpent + l2.totalAmountSpent < 99.999"));
+		// System.out.println("Remaining amount (< 99.999): " + solveAndSetRemaining(dto, "l1.totalAmountSpent + l2.totalAmountSpent < 99.999"));
 
 	}
 
