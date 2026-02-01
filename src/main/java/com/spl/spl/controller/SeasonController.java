@@ -3,6 +3,9 @@ package com.spl.spl.controller;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -28,6 +31,27 @@ public class SeasonController {
 	public ResponseEntity<ItemResponse<Season>> getCurrentSeason() {
 		Season currentSeason = seasonService.getCurrentSeason();
 		return ResponseEntity.ok(new ItemResponse<>(new ItemData<>(currentSeason)));
+	}
+
+	@JsonView(Views.SeasonView.class)
+	@PutMapping("/{id}/complete")
+	public ResponseEntity<ItemResponse<Season>> completeAuction(
+			@PathVariable Long id, 
+			@RequestBody AuctionCompleteRequest request) {
+		Season updatedSeason = seasonService.completeAuction(id, request.getAuctionCompletionNote());
+		return ResponseEntity.ok(new ItemResponse<>(new ItemData<>(updatedSeason)));
+	}
+
+	public static class AuctionCompleteRequest {
+		private String auctionCompletionNote;
+		
+		public String getAuctionCompletionNote() {
+			return auctionCompletionNote;
+		}
+		
+		public void setAuctionCompletionNote(String auctionCompletionNote) {
+			this.auctionCompletionNote = auctionCompletionNote;
+		}
 	}
 
 	

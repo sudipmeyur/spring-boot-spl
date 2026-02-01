@@ -61,7 +61,9 @@ public class FileUploadController {
             
             // Save file
             Path filePath = uploadPath.resolve(filename);
-            Files.copy(file.getInputStream(), filePath, StandardCopyOption.REPLACE_EXISTING);
+            try (var inputStream = file.getInputStream()) {
+                Files.copy(inputStream, filePath, StandardCopyOption.REPLACE_EXISTING);
+            }
             
             // Return the path that frontend can use
             String imagePath = "external-images/images/players/" + filename;

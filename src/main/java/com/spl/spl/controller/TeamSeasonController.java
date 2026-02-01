@@ -2,6 +2,8 @@ package com.spl.spl.controller;
 
 import java.util.List;
 
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -16,6 +18,7 @@ import com.spl.spl.dto.ItemResponse.ItemData;
 import com.spl.spl.dto.ItemsResponse;
 import com.spl.spl.dto.ItemsResponse.ItemsData;
 import com.spl.spl.entity.TeamSeason;
+import com.spl.spl.service.PdfGenerationService;
 import com.spl.spl.service.TeamSeasonService;
 import com.spl.spl.views.Views;
 
@@ -28,6 +31,7 @@ import lombok.RequiredArgsConstructor;
 public class TeamSeasonController {
 
 	private final TeamSeasonService teamSeasonService;
+	private final PdfGenerationService pdfGenerationService;
 
 	@JsonView(Views.TeamSeasonsView.class)
 	@GetMapping
@@ -41,5 +45,20 @@ public class TeamSeasonController {
 	public ResponseEntity<ItemResponse<TeamSeason>> getTeamSeasonById(@PathVariable String id) {
 		TeamSeason teamSeason = teamSeasonService.getTeamSeason(Long.valueOf(id));
 		return ResponseEntity.ok(new ItemResponse<>(new ItemData<>(teamSeason)));
+	}
+
+	@GetMapping("/{id}/pdf")
+	public ResponseEntity<byte[]> generateTeamSquadPdf(@PathVariable String id) {
+		TeamSeason teamSeason = teamSeasonService.getTeamSeason(Long.valueOf(id));
+		byte[] pdfBytes = pdfGenerationService.generateTeamSquadPdf(teamSeason);
+		
+		HttpHeaders headers = new HttpHeaders();
+		headers.setContentType(MediaType.APPLICATION_PDF);
+		headers.setContentDispositionFormData("attachment", 
+				teamSeason.getTeam().getName() + "_Squad_" + teamSeason.getSeason().getCode() + ".pdf");
+		
+		return ResponseEntity.ok()
+				.headers(headers)
+				.body(pdfBytes);
 	}
 }

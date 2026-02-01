@@ -45,4 +45,11 @@ public class Season {
 	
 	@JsonView(Views.Summary.class)
 	private Integer maxFreeAllowed;
+	
+	@JsonView(Views.Base.class)
+	@Column(columnDefinition = "boolean default false")
+	private Boolean isAuctionCompleted = false;
+	
+	@Column(nullable = true)
+	private String auctionCompletionNote;
 }
