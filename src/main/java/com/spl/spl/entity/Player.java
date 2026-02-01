@@ -36,10 +36,15 @@ public class Player {
 	private String imageUrl;
 	
 	@Column(columnDefinition = "boolean default true")
-	private Boolean isActive;
+	private Boolean isActive = true;
 
 	@JsonView(Views.Summary.class)
 	@ManyToOne(fetch = FetchType.LAZY)
 	@JoinColumn(name = "player_level_id")
 	private PlayerLevel playerLevel;
+	
+	@JsonView(Views.Summary.class)
+	@ManyToOne(fetch = FetchType.LAZY)
+	@JoinColumn(name = "category_code")
+	private PlayerCategory category;
 }
